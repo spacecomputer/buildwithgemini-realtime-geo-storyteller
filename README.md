@@ -1,7 +1,21 @@
-# simple-agent
+# 🌍 Realtime Geo-Storyteller
 
-Simple ReAct agent
-Agent generated with `agents-cli` version `1.3.1`
+A conversational AI agent that helps walking travelers explore cities through immersive, location-aware storytelling, delivered via real-time bidirectional audio using the Gemini Live API. 
+
+## 🌟 Why it's helpful
+
+When exploring a new city, travelers often find themselves glued to their phone screens, missing the sights right in front of them while trying to read about them. Realtime Geo-Storyteller solves this by acting as your personal, hands-free tour guide. 
+
+As you walk, the agent seamlessly narrates verified, fascinating facts about the points of interest (POIs) around you. It understands your pace and location, ensuring it only delivers fresh, relevant trivia without repeating itself or interrupting your natural conversation. Keep your eyes on the city, and let the agent tell its story.
+
+## ⚙️ How it works
+
+The Realtime Geo-Storyteller is built on a robust architecture designed for contextual awareness and real-time interaction:
+
+* **Real-time Bidirectional Audio:** Powered by the Gemini Live API, it supports natural, conversational interactions, ensuring the agent doesn't interrupt your ongoing speech.
+* **Contextual Memory:** Tracks `visitedPoiIds` and `deliveredFactHashes` per session. This ensures the agent knows where you've been and what it has already told you, preventing repetitive trivia when you are stationary.
+* **Location & Verification Tools:** Utilizes the Google Places API for accurate location lookups and leverages Google Search Grounding to ensure all historical and cultural facts are verified and hallucination-free.
+* **Rich UI & Mapping:** While primarily audio-first, it also generates verified POI cards (using A2UI) and renders custom GeoJSON on a live map in the frontend for when you want to look deeper into your surroundings.
 
 ## Project Structure
 

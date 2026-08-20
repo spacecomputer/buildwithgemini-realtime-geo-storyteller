@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Live Spatial Audio Tour Guide — UX/UI & Dev Deck</title>
+
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme mode-dev">
+
+  <!-- Top App Navigation Bar -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="gemini-sparkle-icon">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+      </div>
+      <div>
+        <h1>Gemini Live Spatial Storyteller</h1>
+        <span class="subtitle">Multimodal Telemetry & Real-Time Audio Tour Guide</span>
+      </div>
+    </div>
+
+    <!-- State Machine Status Badge -->
+    <div class="header-status-group">
+      <div class="state-badge-container">
+        <span class="badge-label">UI STATE MACHINE</span>
+        <div id="stateMachineBadge" class="state-badge state-idle">
+          <span class="status-dot"></span>
+          <span id="stateMachineText">IDLE_LISTENING</span>
+        </div>
+      </div>
+
+      <!-- Mode Switcher -->
+      <div class="view-mode-toggle">
+        <button id="btnModeMobile" class="toggle-btn" title="End-User Mobile View">
+          <i class="fa-solid fa-mobile-screen-button"></i> Mobile Tour
+        </button>
+        <button id="btnModeDev" class="toggle-btn active" title="Developer & Operator Deck">
+          <i class="fa-solid fa-sliders"></i> Developer Deck
+        </button>
+        <a href="architecture.html" class="toggle-btn" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; color:#cbd5e1;" title="System Architecture & GCP Specs">
+          <i class="fa-solid fa-diagram-project" style="color:var(--accent-cyan);"></i> Architecture
+        </a>
+      </div>
+
+      <!-- Power Button -->
+      <button id="btnTogglePower" class="power-btn btn-connected" title="Start/Stop Live Session">
+        <i class="fa-solid fa-power-off"></i>
+        <span>Live Session</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-workspace">
+
+    <!-- LEFT PANEL: Interactive Map & Spatial Telemetry HUD -->
+    <section class="panel panel-map">
+      <div class="panel-header">
+        <div class="title-group">
+          <i class="fa-solid fa-map-location-dot"></i>
+          <h2>Spatial Telemetry & Geolocation Map</h2>
+        </div>
+        <div class="hud-inline-stats">
+          <span class="hud-pill" id="movementPill"><i class="fa-solid fa-person-walking"></i> WALKING</span>
+          <span class="hud-pill" id="triggerPill"><i class="fa-solid fa-satellite-dish"></i> DISTANCE_DELTA</span>
+        </div>
+      </div>
+
+      <!-- Map Viewport -->
+      <div class="map-wrapper">
+        <div id="leafletMap"></div>
+
+        <!-- Floating Telemetry Overlay HUD -->
+        <div class="telemetry-hud-card">
+          <div class="hud-row">
+            <span class="hud-label">LAT / LNG</span>
+            <span class="hud-value" id="hudCoords">47.6101° N, 122.2015° W</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">SPEED / HEADING</span>
+            <span class="hud-value" id="hudSpeedHeading">1.3 m/s | 142° SE</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">GPS ACCURACY</span>
+            <span class="hud-value" id="hudAccuracy">± 4.2 meters</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">GEOFENCE RADIUS</span>
+            <span class="hud-valueHighlight" id="hudGeofence">150m POI Lookup Bounds</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: Gemini Live Audio & Multimodal Grounding Hub -->
+    <section class="panel panel-audio-hub">
+      <div class="panel-header">
+        <div class="title-group">
+          <i class="fa-solid fa-waveform"></i>
+          <h2>Gemini Live Audio & Grounding Hub</h2>
+        </div>
+        <div class="voice-selector-group">
+          <label for="voiceSelect"><i class="fa-solid fa-microphone-lines"></i> Voice Preset:</label>
+          <select id="voiceSelect" class="voice-select">
+            <option value="Puck">Puck (Enthusiastic & Clear)</option>
+            <option value="Charon">Charon (Deep & Historian)</option>
+            <option value="Kore" selected>Kore (Warm & Storyteller)</option>
+            <option value="Fenrir">Fenrir (Authoritative)</option>
+            <option value="Aoede">Aoede (Expressive)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="audio-hub-content">
+        <!-- Audio Visualizer Section -->
+        <div class="audio-visualizer-card">
+          <div class="visualizer-header">
+            <span id="audioDirectionBadge" class="audio-dir-badge dir-output">
+              <i class="fa-solid fa-volume-high"></i> SERVER STREAMING (24kHz PCM)
+            </span>
+            <span id="audioStatsPill" class="audio-stats-pill">
+              Jitter Buffer: 12ms | Latency: 180ms
+            </span>
+          </div>
+
+          <!-- Canvas Oscilloscope / Spectrum Visualizer -->
+          <div class="canvas-container">
+            <canvas id="audioVisualizerCanvas"></canvas>
+            <div id="visualizerGlow" class="visualizer-glow"></div>
+          </div>
+
+          <!-- Quick Audio Action Controls -->
+          <div class="audio-controls-bar">
+            <button id="btnMicPush" class="action-btn mic-btn" title="Push to Talk / User Interruption">
+              <i class="fa-solid fa-microphone"></i>
+              <span>Push to Speak</span>
+            </button>
+            <button id="btnSimulateInterrupt" class="action-btn interrupt-btn" title="Simulate User Speaking Over Stream (VAD Interrupt)">
+              <i class="fa-solid fa-hand-paper"></i>
+              <span>Interrupt Stream (VAD)</span>
+            </button>
+            <button id="btnManualPoiTrigger" class="action-btn poi-trigger-btn" title="Manually Trigger Nearby POI Event">
+              <i class="fa-solid fa-location-crosshairs"></i>
+              <span>Trigger Nearby POI</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Visited / Active POI Grounding Card -->
+        <div id="poiCard" class="poi-card highlight-glow">
+          <div class="poi-card-image" style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80');">
+            <span class="poi-type-tag"><i class="fa-solid fa-landmark"></i> Urban Park</span>
+            <span class="poi-distance-tag"><i class="fa-solid fa-walking"></i> 35m away</span>
+          </div>
+          <div class="poi-card-body">
+            <div class="poi-title-row">
+              <h3 id="poiTitle">Bellevue Downtown Park</h3>
+              <span id="poiYear" class="poi-year-badge">Est. 1987</span>
+            </div>
+            <p id="poiFactSnippet" class="poi-snippet">
+              A 21-acre urban oasis featuring a 240-foot waterfall, reflection canal, and circular promenade in downtown Bellevue.
+            </p>
+            <div class="grounding-badges">
+              <span class="ground-badge verified"><i class="fa-solid fa-circle-check"></i> Verified by Google Places</span>
+              <span class="ground-badge verified"><i class="fa-solid fa-magnifying-glass"></i> Search Grounded</span>
+              <span id="poiFactHash" class="ground-badge hash"><i class="fa-solid fa-hashtag"></i> FactHash: #bdp1987</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Transcripts & In-Band Context Feed -->
+        <div class="transcript-feed-container">
+          <div class="feed-header">
+            <span><i class="fa-solid fa-comments"></i> Multimodal Session Stream & Context Injections</span>
+            <button id="btnClearFeed" class="icon-btn-sm"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+          <div id="transcriptFeed" class="feed-scroll-area">
+            <!-- Messages dynamically inserted here -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOWER/DEV PANEL: GPX Simulator & Data Payload Inspector Deck (Visible in Dev Mode) -->
+    <section class="panel panel-dev-deck">
+      <div class="panel-header">
+        <div class="title-group">
+          <i class="fa-solid fa-laptop-code"></i>
+          <h2>Developer Simulation & Data Package Inspector</h2>
+        </div>
+        <div class="deck-tabs">
+          <button class="tab-btn active" data-tab="tab-simulator"><i class="fa-solid fa-route"></i> GPX Route Player</button>
+          <button class="tab-btn" data-tab="tab-telemetry"><i class="fa-solid fa-code"></i> Telemetry Payload</button>
+          <button class="tab-btn" data-tab="tab-places"><i class="fa-solid fa-store"></i> Places API Spec</button>
+          <button class="tab-btn" data-tab="tab-websocket"><i class="fa-solid fa-plug"></i> Bidi WebSocket Frame</button>
+          <button class="tab-btn" data-tab="tab-poicache"><i class="fa-solid fa-database"></i> POICache State</button>
+        </div>
+      </div>
+
+      <div class="dev-deck-body">
+        <!-- TAB 1: GPX Route Simulator Controls -->
+        <div id="tab-simulator" class="tab-content active">
+          <div class="simulator-controls-row">
+            <div class="control-group">
+              <label for="routeSelect"><i class="fa-solid fa-map-pin"></i> Select Simulation Trajectory:</label>
+              <select id="routeSelect" class="input-select">
+                <option value="bellevue" selected>Bellevue, WA — Downtown & Waterfront Park Tour</option>
+                <option value="boston">Downtown Boston — Freedom Trail Walking Tour</option>
+                <option value="paris">Paris — Seine River Walk & Notre-Dame Route</option>
+                <option value="tokyo">Tokyo — Shibuya Crossing to Meiji Shrine</option>
+              </select>
+            </div>
+
+            <div class="playback-buttons">
+              <button id="btnPlaySim" class="sim-btn btn-play"><i class="fa-solid fa-play"></i> Play Route</button>
+              <button id="btnPauseSim" class="sim-btn btn-pause" disabled><i class="fa-solid fa-pause"></i> Pause</button>
+              <button id="btnResetSim" class="sim-btn btn-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+            </div>
+
+            <div class="speed-group">
+              <label>Speed Multiplier:</label>
+              <div class="speed-options">
+                <button class="speed-btn" data-speed="1">1x</button>
+                <button class="speed-btn active" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+                <button class="speed-btn" data-speed="10">10x</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sim-progress-bar-container">
+            <div class="sim-progress-labels">
+              <span id="simCurrentPoi">Current POI: Starting Point</span>
+              <span id="simProgressPercentage">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="simProgressBar" class="progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Telemetry Schema JSON Inspector -->
+        <div id="tab-telemetry" class="tab-content">
+          <pre><code id="jsonTelemetry">Loading JSON schema...</code></pre>
+        </div>
+
+        <!-- TAB 3: Places API Request Inspector -->
+        <div id="tab-places" class="tab-content">
+          <pre><code id="jsonPlaces">Loading Places API spec...</code></pre>
+        </div>
+
+        <!-- TAB 4: Gemini Live Bidi WebSocket Inspector -->
+        <div id="tab-websocket" class="tab-content">
+          <pre><code id="jsonWebSocket">Loading WebSocket frame schema...</code></pre>
+        </div>
+
+        <!-- TAB 5: POICache & Visited State Inspector -->
+        <div id="tab-poicache" class="tab-content">
+          <pre><code id="jsonPoiCache">Loading POICache state...</code></pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- Application JS -->
+  <script src="app.js"></script>
+</body>
+</html>

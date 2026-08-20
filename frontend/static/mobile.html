@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#090d16">
+  <title>Gemini Live Spatial Tour — Mobile Audio Guide</title>
+
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Mobile-specific shell overrides */
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: fixed;
+      touch-action: manipulation;
+    }
+
+    .mobile-app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: -webkit-fill-available;
+      width: 100vw;
+      background: #090d16;
+      position: relative;
+    }
+
+    /* Top Floating Bar */
+    .mobile-top-bar {
+      position: absolute;
+      top: env(safe-area-inset-top, 12px);
+      left: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(18, 24, 38, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .mobile-logo-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mobile-logo-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4285f4, #9b51e0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 16px;
+      box-shadow: 0 0 12px rgba(66, 133, 244, 0.4);
+    }
+
+    .mobile-title-text h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .mobile-title-text span {
+      font-size: 0.68rem;
+      color: var(--accent-cyan);
+      font-family: 'JetBrains Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .gps-status-pill {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .gps-status-pill.active {
+      background: rgba(0, 230, 118, 0.15);
+      color: #00e676;
+      border: 1px solid rgba(0, 230, 118, 0.4);
+    }
+
+    .gps-status-pill.seeking {
+      background: rgba(255, 170, 0, 0.15);
+      color: #ffaa00;
+      border: 1px solid rgba(255, 170, 0, 0.4);
+    }
+
+    /* Fullscreen Map Viewport */
+    .mobile-map-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    #mobileMap {
+      width: 100%;
+      height: 100%;
+      background: #090d16;
+    }
+
+    /* Mobile Floating Controls (GPS Recenter, Audio Switch, Mode) */
+    .mobile-fab-column {
+      position: absolute;
+      right: 14px;
+      bottom: 240px;
+      z-index: 900;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mobile-fab {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(18, 24, 38, 0.9);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mobile-fab:active {
+      transform: scale(0.92);
+      background: var(--accent-primary);
+    }
+
+    .mobile-fab.active {
+      background: var(--accent-primary);
+      box-shadow: 0 0 15px rgba(66, 133, 244, 0.5);
+    }
+
+    /* Bottom Sheet Audio & POI Panel */
+    .mobile-bottom-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(14, 20, 32, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px 24px 0 0;
+      padding: 14px 16px env(safe-area-inset-bottom, 16px) 16px;
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: transform 0.3s ease;
+    }
+
+    .sheet-handle-bar {
+      width: 36px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+      margin: 0 auto 4px auto;
+    }
+
+    /* Live Telemetry Pill Bar */
+    .mobile-telemetry-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .telemetry-item i {
+      color: var(--accent-cyan);
+    }
+
+    /* Audio Waveform & Mic Row */
+    .mobile-audio-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mobile-canvas-wrap {
+      flex: 1;
+      height: 52px;
+      background: #050810;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #mobileCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .mobile-mic-button {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #00e5ff, #4285f4);
+      border: none;
+      color: #000;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+      cursor: pointer;
+    }
+
+    .mobile-mic-button:active {
+      transform: scale(0.95);
+      background: var(--accent-crimson);
+      color: #fff;
+    }
+
+    /* Compact Mobile POI Card */
+    .mobile-poi-card {
+      background: rgba(28, 36, 56, 0.7);
+      border: 1px solid rgba(66, 133, 244, 0.3);
+      border-radius: 16px;
+      padding: 10px 12px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .mobile-poi-thumb {
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      background-size: cover;
+      background-position: center;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .mobile-poi-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .mobile-poi-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mobile-poi-snippet {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mobile-poi-meta {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .mobile-dist-badge {
+      color: var(--accent-green);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-app-shell">
+
+    <!-- Top Floating Header Bar -->
+    <header class="mobile-top-bar">
+      <div class="mobile-logo-group">
+        <div class="mobile-logo-icon">
+          <i class="fa-solid fa-location-arrow"></i>
+        </div>
+        <div class="mobile-title-text">
+          <h1>Gemini Live Tour</h1>
+          <span><i class="fa-solid fa-circle" style="font-size:6px; color:#00e676;"></i> REALTIME GPS</span>
+        </div>
+      </div>
+
+      <div id="gpsPill" class="gps-status-pill seeking">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <span id="gpsPillText">ACQUIRING GPS</span>
+      </div>
+    </header>
+
+    <!-- Fullscreen Map -->
+    <div class="mobile-map-container">
+      <div id="mobileMap"></div>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="mobile-fab-column">
+      <button id="btnRecenter" class="mobile-fab" title="Recenter on Real Device Location">
+        <i class="fa-solid fa-crosshairs"></i>
+      </button>
+      <button id="btnToggleSim" class="mobile-fab" title="Switch GPS Source (Device vs Simulated Walk)">
+        <i class="fa-solid fa-route"></i>
+      </button>
+      <button id="btnAudioToggle" class="mobile-fab active" title="Toggle Spatial Audio Narration">
+        <i class="fa-solid fa-volume-high"></i>
+      </button>
+      <a href="architecture.html" class="mobile-fab" style="text-decoration:none;" title="View System Architecture">
+        <i class="fa-solid fa-diagram-project" style="color:var(--accent-cyan);"></i>
+      </a>
+    </div>
+
+    <!-- Bottom Audio & POI Sheet -->
+    <div class="mobile-bottom-sheet">
+      <div class="sheet-handle-bar"></div>
+
+      <!-- Live GPS Telemetry Bar -->
+      <div class="mobile-telemetry-bar">
+        <div class="telemetry-item">
+          <i class="fa-solid fa-compass"></i>
+          <span id="mobileCoords">Waiting for GPS...</span>
+        </div>
+        <div class="telemetry-item">
+          <i class="fa-solid fa-gauge-high"></i>
+          <span id="mobileSpeed">0.0 m/s</span>
+        </div>
+        <div class="telemetry-item">
+          <i class="fa-solid fa-bullseye"></i>
+          <span id="mobileAccuracy">± --m</span>
+        </div>
+      </div>
+
+      <!-- Audio Waveform Visualizer & Push-To-Talk Mic Button -->
+      <div class="mobile-audio-row">
+        <div class="mobile-canvas-wrap">
+          <canvas id="mobileCanvas"></canvas>
+        </div>
+        <button id="btnMobileMic" class="mobile-mic-button" title="Push to Speak / Interrupt">
+          <i class="fa-solid fa-microphone"></i>
+        </button>
+      </div>
+
+      <!-- Active Nearby POI Card -->
+      <div id="mobilePoiCard" class="mobile-poi-card">
+        <div id="mobilePoiThumb" class="mobile-poi-thumb" style="background-image: url('https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=400&q=80');"></div>
+        <div class="mobile-poi-info">
+          <div id="mobilePoiTitle" class="mobile-poi-title">Faneuil Hall & Quincy Market</div>
+          <div id="mobilePoiSnippet" class="mobile-poi-snippet">Walk within 50m of historical landmarks to automatically unlock audio stories.</div>
+          <div class="mobile-poi-meta">
+            <span id="mobilePoiDistance" class="mobile-dist-badge"><i class="fa-solid fa-walking"></i> 38m away</span>
+            <span style="color: var(--accent-amber);"><i class="fa-solid fa-calendar-days"></i> Est. 1742</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Mobile Engine Script -->
+  <script src="mobile.js"></script>
+</body>
+</html>
